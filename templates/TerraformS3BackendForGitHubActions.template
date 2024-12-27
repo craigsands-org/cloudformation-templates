@@ -73,7 +73,19 @@ Resources:
     UpdateReplacePolicy: Retain
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub terraform-state-${AWS::AccountId}
+      BucketName: !Join
+        - '-'
+        - - terraform-state
+          - !Select
+            - 4
+            - !Split
+              - '-'
+              - !Select
+                - 2
+                - !Split
+                  - /
+                  - !Ref AWS::StackId
+          - !Ref AWS::AccountId
       LifecycleConfiguration:
         Rules:
           - NoncurrentVersionExpirationInDays: 30
