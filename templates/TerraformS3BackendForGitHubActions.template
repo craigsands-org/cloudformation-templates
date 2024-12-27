@@ -1,0 +1,128 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+Description: Deploy resources to enable GitHub Actions to run Terraform backed by S3.
+
+Parameters:
+  ProviderThumbprintList:
+    Type: CommaDelimitedList
+
+  SubjectClaimFilter:
+    Type: String
+
+  TerraformPlanManagedPolicyArns:
+    Type: CommaDelimitedList
+    Default: arn:aws:iam::aws:policy/ReadOnlyAccess
+
+  TerraformApplyManagedPolicyArns:
+    Type: CommaDelimitedList
+    Default: arn:aws:iam::aws:policy/AdministratorAccess
+
+Resources:
+  GitHubIdentityProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList: !Ref ProviderThumbprintList
+
+  TerraformPlanRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: IAM role to generate Terraform plans
+      RoleName: TerraformPlanRoleForGitHubActions
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowIdentityProvider
+            Effect: Allow
+            Principal:
+              Federated: !GetAtt GitHubIdentityProvider.Arn
+            Action:
+              - sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Ref SubjectClaimFilter
+      ManagedPolicyArns: !Ref TerraformPlanManagedPolicyArns
+
+  TerraformApplyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: IAM role to apply Terraform
+      RoleName: TerraformApplyRoleForGitHubActions
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: AllowIdentityProvider
+            Effect: Allow
+            Principal:
+              Federated: !GetAtt GitHubIdentityProvider.Arn
+            Action:
+              - sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Ref SubjectClaimFilter
+      ManagedPolicyArns: !Ref TerraformApplyManagedPolicyArns
+
+  TerraformStateBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub terraform-state-${AWS::AccountId}
+      LifecycleConfiguration:
+        Rules:
+          - NoncurrentVersionExpirationInDays: 30
+            Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+
+  TerraformStateLockTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: terraform-state-lock
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: LockID
+          AttributeType: S
+      KeySchema:
+        - AttributeName: LockID
+          KeyType: HASH
+
+Outputs:
+  GitHubIdentityProviderArn:
+    Description: The ARN of the OpenID Connect Identity Provider for GitHub
+    Value: !Ref GitHubIdentityProvider
+    Export:
+      Name: !Sub ${AWS::StackName}-GitHubIdentityProvider
+
+  TerraformPlanRoleName:
+    Description: The name of the IAM role to generate Terraform plans
+    Value: !Ref TerraformPlanRole
+    Export:
+      Name: !Sub ${AWS::StackName}-TerraformPlanRoleName
+
+  TerraformApplyRoleName:
+    Description: The name of the IAM role to apply Terraform
+    Value: !Ref TerraformApplyRole
+    Export:
+      Name: !Sub ${AWS::StackName}-TerraformApplyRoleName
+
+  TerraformStateBucketName:
+    Description: The name of the S3 bucket used as a Terraform backend
+    Value: !Ref TerraformStateBucket
+    Export:
+      Name: !Sub ${AWS::StackName}-TerraformStateBucketName
+
+  TerraformStateLockTable:
+    Description: The name of the DynamoDB table used to hold the Terraform lock
+    Value: !Ref TerraformStateLockTable
+    Export:
+      Name: !Sub ${AWS::StackName}-TerraformStateLockTableName
