@@ -69,6 +69,8 @@ Resources:
       ManagedPolicyArns: !Ref TerraformApplyManagedPolicyArns
 
   TerraformStateBucket:
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Sub terraform-state-${AWS::AccountId}
@@ -85,6 +87,8 @@ Resources:
         Status: Enabled
 
   TerraformStateLockTable:
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: terraform-state-lock
