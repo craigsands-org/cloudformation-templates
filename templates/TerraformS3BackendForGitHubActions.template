@@ -6,12 +6,15 @@ Parameters:
   ProviderThumbprintList:
     Type: CommaDelimitedList
 
-  SubjectClaimFilter:
+  TerraformPlanSubjectClaimFilter:
     Type: String
 
   TerraformPlanManagedPolicyArns:
     Type: CommaDelimitedList
     Default: arn:aws:iam::aws:policy/ReadOnlyAccess
+
+  TerraformApplySubjectClaimFilter:
+    Type: String
 
   TerraformApplyManagedPolicyArns:
     Type: CommaDelimitedList
@@ -44,7 +47,7 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: !Ref SubjectClaimFilter
+                token.actions.githubusercontent.com:sub: !Ref TerraformPlanSubjectClaimFilter
       ManagedPolicyArns: !Ref TerraformPlanManagedPolicyArns
 
   TerraformApplyRole:
@@ -65,7 +68,7 @@ Resources:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
               StringLike:
-                token.actions.githubusercontent.com:sub: !Ref SubjectClaimFilter
+                token.actions.githubusercontent.com:sub: !Ref TerraformApplySubjectClaimFilter
       ManagedPolicyArns: !Ref TerraformApplyManagedPolicyArns
 
   TerraformStateBucket:
